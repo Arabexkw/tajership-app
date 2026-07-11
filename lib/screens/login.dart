@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../config.dart';
 import '../main.dart';
+import 'market.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -58,7 +59,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('دخول موحد — تاجر / سائق / أدمن',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white70)),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 24),
+                  // دخول العميل للسوق — بدون تسجيل
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      side: const BorderSide(color: Color(AppConfig.amber)),
+                      foregroundColor: const Color(AppConfig.amber),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => const MarketScreen())),
+                    icon: const Icon(Icons.shopping_bag_outlined),
+                    label: const Text('تسوّق من السوق'),
+                  ),
+                  const SizedBox(height: 24),
                   TextField(
                     controller: _user,
                     textInputAction: TextInputAction.next,
