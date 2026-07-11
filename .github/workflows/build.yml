@@ -50,19 +50,19 @@ jobs:
         run: flutter build apk --release
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk TajerShip-v0.1.0.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk TajerShip-v0.2.0.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: TajerShip-APK
-          path: TajerShip-v0.1.0.apk
+          path: TajerShip-v0.2.0.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0-b${{ github.run_number }}
-          name: TajerShip v0.1.0 (build ${{ github.run_number }})
-          files: TajerShip-v0.1.0.apk
+          tag_name: v0.2.0-b${{ github.run_number }}
+          name: TajerShip v0.2.0 (build ${{ github.run_number }})
+          files: TajerShip-v0.2.0.apk
 
   # نسخة ويب من نفس التطبيق — للمعاينة على آيفون/أي متصفح
   web:
