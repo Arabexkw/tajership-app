@@ -63,3 +63,36 @@ jobs:
           tag_name: v0.1.0-b${{ github.run_number }}
           name: TajerShip v0.1.0 (build ${{ github.run_number }})
           files: TajerShip-v0.1.0.apk
+
+  # نسخة ويب من نفس التطبيق — للمعاينة على آيفون/أي متصفح
+  web:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Generate web platform
+        run: |
+          flutter create --org com.arabex --project-name tajership --platforms web .
+          rm -rf test
+
+      - name: Build web
+        run: flutter build web --release --base-href /tajership-app/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
