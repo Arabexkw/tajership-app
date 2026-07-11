@@ -134,8 +134,31 @@ class _MarketScreenState extends State<MarketScreen> {
 }
 
 /// زر السلة الموحد في الشريط العلوي (مع عدّاد)
-class CartButton extends StatelessWidget {
+/// ملاحظة: StatefulWidget يستمع لتغيّر السلة حتى يتحدث العدّاد فوراً
+/// (كان const StatelessWidget فلا يُعاد بناؤه أبداً — سبب اختفاء العدّاد في v0.2)
+class CartButton extends StatefulWidget {
   const CartButton({super.key});
+
+  @override
+  State<CartButton> createState() => _CartButtonState();
+}
+
+class _CartButtonState extends State<CartButton> {
+  @override
+  void initState() {
+    super.initState();
+    cart.listeners.add(_onChange);
+  }
+
+  @override
+  void dispose() {
+    cart.listeners.remove(_onChange);
+    super.dispose();
+  }
+
+  void _onChange() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +166,7 @@ class CartButton extends StatelessWidget {
       tooltip: 'السلة',
       onPressed: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const CartScreen()))
-          .then((_) => (context as Element).markNeedsBuild()),
+          .then((_) => _onChange()),
       icon: Badge(
         isLabelVisible: cart.count > 0,
         label: Text('${cart.count}'),
