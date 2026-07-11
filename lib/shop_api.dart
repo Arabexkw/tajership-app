@@ -139,6 +139,15 @@ class Cart {
   String storeName = '';
   final List<CartLine> lines = [];
 
+  /// مستمعون لتغيّر السلة (عدّاد الزر وغيره)
+  final List<void Function()> listeners = [];
+
+  void _notify() {
+    for (final l in List.of(listeners)) {
+      l();
+    }
+  }
+
   bool get isEmpty => lines.isEmpty;
 
   int get count => lines.fold(0, (s, l) => s + l.qty);
@@ -159,23 +168,27 @@ class Cart {
     } else {
       existing.first.qty += q;
     }
+    _notify();
   }
 
   void setQty(int productId, int qty) {
     for (final l in lines) {
       if (l.product.id == productId) l.qty = qty < 1 ? 1 : qty;
     }
+    _notify();
   }
 
   void remove(int productId) {
     lines.removeWhere((l) => l.product.id == productId);
     if (lines.isEmpty) storeId = null;
+    _notify();
   }
 
   void clear() {
     lines.clear();
     storeId = null;
     storeName = '';
+    _notify();
   }
 }
 
@@ -234,30 +247,54 @@ class ShopApi {
     );
   }
 
-  /// إنشاء الطلب — الدفع عند الاستلام (COD) في هذه النسخة
+  /// بيانات عميل مسجل (دفتر العناوين) — بحث بالهاتف
+  static Future<Map<String, dynamic>?> customerLookup(String phone) async {
+    final res = await http
+        .get(Uri.parse('${AppConfig.apiBase}/shop.php?action=customer_lookup&phone=$phone'))
+        .timeout(const Duration(seconds: 15));
+    final j = jsonDecode(res.body) as Map<String, dynamic>;
+    if (j['ok'] == true && j['found'] == true) {
+      return j['data'] as Map<String, dynamic>?;
+    }
+    return null;
+  }
+
+  /// إنشاء الطلب — الدفع عند الاستلام (COD)
+  /// العقد المؤكد من السيرفر الحي: customer:{name,phone,email} +
+  /// address:{scope, area_id | country/region/addr_line} + items:[{product_id,qty}]
   static Future<Map<String, dynamic>> checkout({
     required int storeId,
     required String name,
     required String phone,
     required String email,
-    required ShipArea area,
-    required String addressLine,
+    required String scope, // kw / gcc / arab / intl
+    ShipArea? area,
     String block = '',
     String street = '',
     String building = '',
+    String country = '',
+    String region = '',
+    String addrLine = '',
+    String postalCode = '',
     String note = '',
     required List<CartLine> items,
   }) async {
     final body = {
-      'customer': {'name': name, 'phone': phone},
-      'email': email,
-      'scope': 'kw',
-      'area_id': area.id,
-      'address': addressLine,
-      'addr_line': addressLine,
-      'block': block,
-      'street': street,
-      'building': building,
+      'customer': {'name': name, 'phone': phone, 'email': email},
+      'address': {
+        'scope': scope,
+        if (scope == 'kw') ...{
+          'area_id': area?.id,
+          'block': block,
+          'street': street,
+          'building': building,
+        } else ...{
+          'country': country,
+          'region': region,
+          'addr_line': addrLine,
+          'postal_code': postalCode,
+        },
+      },
       'customer_note': note,
       'payment_method': 'cod',
       'items': items.map((l) => {'product_id': l.product.id, 'qty': l.qty}).toList(),
