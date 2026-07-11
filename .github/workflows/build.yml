@@ -1,0 +1,63 @@
+name: Build TajerShip APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      # يولّد مجلدات المنصات (android/) حول الكود الموجود
+      - name: Generate platform folders
+        run: flutter create --org com.arabex --project-name tajership --platforms android .
+
+      # اسم التطبيق بالعربي + صلاحية الإنترنت لنسخة الإصدار
+      - name: Configure Android manifest
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="tajership"/android:label="تاجرشِب"/' "$M"
+          grep -q "android.permission.INTERNET" "$M" || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$M"
+          cat "$M"
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk TajerShip-v0.1.0.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TajerShip-APK
+          path: TajerShip-v0.1.0.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-b${{ github.run_number }}
+          name: TajerShip v0.1.0 (build ${{ github.run_number }})
+          files: TajerShip-v0.1.0.apk
