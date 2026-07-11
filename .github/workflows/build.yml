@@ -27,7 +27,9 @@ jobs:
 
       # يولّد مجلدات المنصات (android/) حول الكود الموجود
       - name: Generate platform folders
-        run: flutter create --org com.arabex --project-name tajership --platforms android .
+        run: |
+          flutter create --org com.arabex --project-name tajership --platforms android .
+          rm -rf test  # يولّده flutter create بقالب لا يطابق تطبيقنا
 
       # اسم التطبيق بالعربي + صلاحية الإنترنت لنسخة الإصدار
       - name: Configure Android manifest
