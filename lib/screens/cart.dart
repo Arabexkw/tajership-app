@@ -155,12 +155,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _block = TextEditingController();
   final _street = TextEditingController();
   final _building = TextEditingController();
+  final _country = TextEditingController();
+  final _region = TextEditingController();
+  final _addrLine = TextEditingController();
+  final _postal = TextEditingController();
   final _note = TextEditingController();
 
   List<ShipArea> _areas = [];
   ShipArea? _area;
+  String _scope = 'kw'; // kw / gcc / arab / intl
   bool _loadingAreas = true;
   bool _submitting = false;
+  bool _lookingUp = false;
+  bool _lookupDone = false;
   String? _error;
 
   @override
@@ -184,11 +191,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  double get _shipFee => _area?.fee ?? 0;
+  Future<void> _lookup(String phone) async {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 8 || _lookingUp || _lookupDone) return;
+    setState(() => _lookingUp = true);
+    try {
+      final d = await ShopApi.customerLookup(digits);
+      if (d != null && mounted) {
+        setState(() {
+          _lookupDone = true;
+          if ((d['name'] ?? '').toString().isNotEmpty && _name.text.isEmpty) {
+            _name.text = d['name'].toString();
+          }
+          if ((d['email'] ?? '').toString().isNotEmpty && _email.text.isEmpty) {
+            _email.text = d['email'].toString();
+          }
+          final sc = (d['ship_scope'] ?? '').toString();
+          if (sc.isNotEmpty) _scope = sc;
+          final aid = d['area_id'];
+          if (aid != null && _areas.isNotEmpty) {
+            final found = _areas.where((a) => a.id == (aid as num).toInt()).toList();
+            if (found.isNotEmpty) _area = found.first;
+          }
+          if ((d['block'] ?? '').toString().isNotEmpty) _block.text = d['block'].toString();
+          if ((d['street'] ?? '').toString().isNotEmpty) _street.text = d['street'].toString();
+          if ((d['building'] ?? '').toString().isNotEmpty) _building.text = d['building'].toString();
+          if ((d['country'] ?? '').toString().isNotEmpty) _country.text = d['country'].toString();
+          if ((d['region'] ?? '').toString().isNotEmpty) _region.text = d['region'].toString();
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('تم جلب بياناتك المسجلة'),
+              duration: Duration(seconds: 2)));
+        }
+      }
+    } catch (_) {
+      // اختياري
+    } finally {
+      if (mounted) setState(() => _lookingUp = false);
+    }
+  }
+
+  double get _shipFee => _scope == 'kw' ? (_area?.fee ?? 0) : 0;
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    if (_area == null) {
+    if (_scope == 'kw' && _area == null) {
       setState(() => _error = 'اختر منطقة التوصيل');
       return;
     }
@@ -197,18 +245,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = null;
     });
     try {
-      final addr =
-          'قطعة ${_block.text.trim()} - شارع ${_street.text.trim()} - مبنى ${_building.text.trim()}';
       final result = await ShopApi.checkout(
         storeId: cart.storeId!,
         name: _name.text.trim(),
         phone: _phone.text.trim(),
         email: _email.text.trim(),
-        area: _area!,
-        addressLine: addr,
+        scope: _scope,
+        area: _area,
         block: _block.text.trim(),
         street: _street.text.trim(),
         building: _building.text.trim(),
+        country: _country.text.trim(),
+        region: _region.text.trim(),
+        addrLine: _addrLine.text.trim(),
+        postalCode: _postal.text.trim(),
         note: _note.text.trim(),
         items: cart.lines,
       );
@@ -248,8 +298,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             TextFormField(
               controller: _phone,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                  hintText: 'رقم الهاتف (8 أرقام)', prefixIcon: Icon(Icons.phone_outlined)),
+              onChanged: _lookup,
+              decoration: InputDecoration(
+                  hintText: 'رقم الهاتف (8 أرقام)',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  suffixIcon: _lookingUp
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2)))
+                      : null),
               validator: (v) =>
                   (v == null || v.trim().replaceAll(RegExp(r'\D'), '').length < 8)
                       ? 'رقم غير صحيح'
@@ -269,6 +329,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const Text('عنوان التوصيل',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 10),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'kw', label: Text('الكويت')),
+                ButtonSegment(value: 'gcc', label: Text('الخليج')),
+                ButtonSegment(value: 'arab', label: Text('عربي')),
+                ButtonSegment(value: 'intl', label: Text('دولي')),
+              ],
+              selected: {_scope},
+              onSelectionChanged: (sel) => setState(() => _scope = sel.first),
+            ),
+            const SizedBox(height: 12),
+            if (_scope == 'kw') ...[
             _loadingAreas
                 ? const Center(
                     child: Padding(
@@ -294,7 +366,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: TextFormField(
                     controller: _block,
                     decoration: const InputDecoration(hintText: 'القطعة'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                    validator: (v) => (_scope == 'kw' && (v == null || v.trim().isEmpty)) ? 'مطلوب' : null,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -302,7 +374,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: TextFormField(
                     controller: _street,
                     decoration: const InputDecoration(hintText: 'الشارع'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                    validator: (v) => (_scope == 'kw' && (v == null || v.trim().isEmpty)) ? 'مطلوب' : null,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -310,11 +382,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: TextFormField(
                     controller: _building,
                     decoration: const InputDecoration(hintText: 'المبنى'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                    validator: (v) => (_scope == 'kw' && (v == null || v.trim().isEmpty)) ? 'مطلوب' : null,
                   ),
                 ),
               ],
             ),
+            ] else ...[
+              TextFormField(
+                controller: _country,
+                decoration: const InputDecoration(
+                    hintText: 'الدولة', prefixIcon: Icon(Icons.public)),
+                validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب الدولة' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _region,
+                decoration: const InputDecoration(
+                    hintText: 'المدينة / المنطقة', prefixIcon: Icon(Icons.location_city)),
+                validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب المدينة' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _addrLine,
+                decoration: const InputDecoration(
+                    hintText: 'العنوان التفصيلي', prefixIcon: Icon(Icons.home_outlined)),
+                validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب العنوان' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _postal,
+                decoration: const InputDecoration(
+                    hintText: 'الرمز البريدي (اختياري)',
+                    prefixIcon: Icon(Icons.markunread_mailbox_outlined)),
+              ),
+            ],
             const SizedBox(height: 10),
             TextFormField(
               controller: _note,
@@ -329,9 +430,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     _row('المنتجات (${cart.count})', kd(cart.subtotal)),
                     const SizedBox(height: 6),
-                    _row('الشحن', _area == null ? '—' : kd(_shipFee)),
+                    _row(
+                        'الشحن',
+                        _scope != 'kw'
+                            ? 'يُحسب حسب الوجهة والوزن'
+                            : (_area == null ? '—' : kd(_shipFee))),
                     const Divider(color: Colors.white12, height: 20),
-                    _row('الإجمالي', kd(cart.subtotal + _shipFee), bold: true),
+                    _row(
+                        _scope == 'kw' ? 'الإجمالي' : 'الإجمالي (بدون شحن)',
+                        kd(cart.subtotal + _shipFee),
+                        bold: true),
                     const SizedBox(height: 6),
                     const Row(
                       children: [
