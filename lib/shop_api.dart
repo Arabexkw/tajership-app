@@ -259,6 +259,19 @@ class ShopApi {
     return null;
   }
 
+  /// تسعير شحن دولي مبدئي من السيرفر (يرجع 0 إن لم تُربط الوجهة بعد)
+  static Future<double> intlQuote(String scope, String country) async {
+    final res = await http
+        .get(Uri.parse(
+            '${AppConfig.apiBase}/shop.php?action=area_ship&scope=$scope&country=${Uri.encodeQueryComponent(country)}'))
+        .timeout(const Duration(seconds: 15));
+    final j = jsonDecode(res.body) as Map<String, dynamic>;
+    if (j['ok'] == true) {
+      return double.tryParse((j['total'] ?? '0').toString()) ?? 0;
+    }
+    return 0;
+  }
+
   /// إنشاء الطلب — الدفع عند الاستلام (COD)
   /// العقد المؤكد من السيرفر الحي: customer:{name,phone,email} +
   /// address:{scope, area_id | country/region/addr_line} + items:[{product_id,qty}]
@@ -276,6 +289,7 @@ class ShopApi {
     String region = '',
     String addrLine = '',
     String postalCode = '',
+    String nationalAddr = '',
     String note = '',
     required List<CartLine> items,
   }) async {
@@ -293,6 +307,7 @@ class ShopApi {
           'region': region,
           'addr_line': addrLine,
           'postal_code': postalCode,
+          'national_addr': nationalAddr,
         },
       },
       'customer_note': note,
