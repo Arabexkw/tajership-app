@@ -159,6 +159,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _region = TextEditingController();
   final _addrLine = TextEditingController();
   final _postal = TextEditingController();
+  final _natAddr = TextEditingController();
   final _note = TextEditingController();
 
   List<ShipArea> _areas = [];
@@ -168,6 +169,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _submitting = false;
   bool _lookingUp = false;
   bool _lookupDone = false;
+  double? _intlFee;
   String? _error;
 
   @override
@@ -232,7 +234,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  double get _shipFee => _scope == 'kw' ? (_area?.fee ?? 0) : 0;
+  static const _gccCountries = ['السعودية', 'الإمارات', 'قطر', 'البحرين', 'عُمان'];
+  static const _arabCountries = ['مصر', 'الأردن', 'العراق', 'لبنان', 'سوريا', 'فلسطين', 'اليمن', 'ليبيا', 'تونس', 'الجزائر', 'المغرب', 'السودان'];
+
+  List<String> get _countryChoices => _scope == 'gcc' ? _gccCountries : _arabCountries;
+
+  /// يطلب تسعير الشحن للوجهة من السيرفر (الأسعار من قاعدة البيانات حصراً)
+  Future<void> _quoteIntl() async {
+    if (_scope == 'kw' || _country.text.trim().isEmpty) return;
+    try {
+      final fee = await ShopApi.intlQuote(_scope, _country.text.trim());
+      if (mounted) setState(() => _intlFee = fee);
+    } catch (_) {}
+  }
+
+  double get _shipFee => _scope == 'kw' ? (_area?.fee ?? 0) : (_intlFee ?? 0);
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
@@ -259,6 +275,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         region: _region.text.trim(),
         addrLine: _addrLine.text.trim(),
         postalCode: _postal.text.trim(),
+        nationalAddr: _natAddr.text.trim(),
         note: _note.text.trim(),
         items: cart.lines,
       );
@@ -337,7 +354,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ButtonSegment(value: 'intl', label: Text('دولي')),
               ],
               selected: {_scope},
-              onSelectionChanged: (sel) => setState(() => _scope = sel.first),
+              onSelectionChanged: (sel) => setState(() {
+                _scope = sel.first;
+                _country.clear();
+                _intlFee = null;
+              }),
             ),
             const SizedBox(height: 12),
             if (_scope == 'kw') ...[
@@ -388,12 +409,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
             ] else ...[
-              TextFormField(
-                controller: _country,
-                decoration: const InputDecoration(
-                    hintText: 'الدولة', prefixIcon: Icon(Icons.public)),
-                validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب الدولة' : null,
-              ),
+              if (_scope == 'intl')
+                TextFormField(
+                  controller: _country,
+                  decoration: const InputDecoration(
+                      hintText: 'الدولة', prefixIcon: Icon(Icons.public)),
+                  onChanged: (_) => _quoteIntl(),
+                  validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب الدولة' : null,
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _countryChoices.contains(_country.text) ? _country.text : null,
+                  decoration: const InputDecoration(
+                      hintText: 'الدولة', prefixIcon: Icon(Icons.public)),
+                  dropdownColor: const Color(0xFF1D232B),
+                  items: _countryChoices
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (c) {
+                    setState(() => _country.text = c ?? '');
+                    _quoteIntl();
+                  },
+                  validator: (v) => (_scope != 'kw' && (v == null || v.isEmpty)) ? 'اختر الدولة' : null,
+                ),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _region,
@@ -408,13 +446,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     hintText: 'العنوان التفصيلي', prefixIcon: Icon(Icons.home_outlined)),
                 validator: (v) => (_scope != 'kw' && (v == null || v.trim().isEmpty)) ? 'اكتب العنوان' : null,
               ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _postal,
-                decoration: const InputDecoration(
-                    hintText: 'الرمز البريدي (اختياري)',
-                    prefixIcon: Icon(Icons.markunread_mailbox_outlined)),
-              ),
+              if (_country.text == 'السعودية') ...[
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _natAddr,
+                  decoration: const InputDecoration(
+                      hintText: 'العنوان الوطني السعودي (مثال: RRRD2929)',
+                      prefixIcon: Icon(Icons.pin_outlined)),
+                ),
+              ],
+              if (_scope == 'intl') ...[
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _postal,
+                  decoration: const InputDecoration(
+                      hintText: 'الرمز البريدي',
+                      prefixIcon: Icon(Icons.markunread_mailbox_outlined)),
+                ),
+              ],
             ],
             const SizedBox(height: 10),
             TextFormField(
@@ -433,11 +482,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     _row(
                         'الشحن',
                         _scope != 'kw'
-                            ? 'يُحسب حسب الوجهة والوزن'
+                            ? ((_intlFee ?? 0) > 0 ? kd(_intlFee!) : 'تُحدد عند تأكيد المتجر')
                             : (_area == null ? '—' : kd(_shipFee))),
                     const Divider(color: Colors.white12, height: 20),
                     _row(
-                        _scope == 'kw' ? 'الإجمالي' : 'الإجمالي (بدون شحن)',
+                        (_scope == 'kw' || (_intlFee ?? 0) > 0) ? 'الإجمالي' : 'الإجمالي (بدون شحن)',
                         kd(cart.subtotal + _shipFee),
                         bold: true),
                     const SizedBox(height: 6),
