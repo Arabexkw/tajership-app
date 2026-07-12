@@ -259,11 +259,12 @@ class ShopApi {
     return null;
   }
 
-  /// تسعير شحن دولي مبدئي من السيرفر (يرجع 0 إن لم تُربط الوجهة بعد)
-  static Future<double> intlQuote(String scope, String country) async {
+  /// تسعير شحن دولي حي من محرك الأسعار — يتطلب المتجر والعناصر لحساب الوزن
+  static Future<double> intlQuote(String scope, String country, int storeId, List<CartLine> items) async {
+    final itemsParam = items.map((l) => '${l.product.id}:${l.qty}').join(',');
     final res = await http
         .get(Uri.parse(
-            '${AppConfig.apiBase}/shop.php?action=area_ship&scope=$scope&country=${Uri.encodeQueryComponent(country)}'))
+            '${AppConfig.apiBase}/shop.php?action=area_ship&scope=$scope&country=${Uri.encodeQueryComponent(country)}&stores=$storeId&items=${Uri.encodeQueryComponent(itemsParam)}'))
         .timeout(const Duration(seconds: 15));
     final j = jsonDecode(res.body) as Map<String, dynamic>;
     if (j['ok'] == true) {
