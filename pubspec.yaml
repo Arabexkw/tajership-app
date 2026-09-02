@@ -1,7 +1,7 @@
 name: tajership
-description: "تطبيق تاجرشِب الموحد — منصة التجارة والشحن من ArabEx Express"
+description: "تاجرشِب — منصة التجارة والشحن من ArabEx Express"
 publish_to: "none"
-version: 0.5.0+5
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -11,11 +11,31 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  http: ^1.2.0
+  # WebView الرسمي من Flutter (iOS WKWebView / Android WebView)
+  webview_flutter: ^4.8.0
+  # المشاركة الأصلية (Share Sheet)
+  share_plus: ^10.0.0
+  # فتح الروابط الخارجية (واتساب/هاتف/بوابات)
+  url_launcher: ^6.3.0
+  # الإشعارات (Firebase Cloud Messaging)
+  firebase_core: ^3.4.0
+  firebase_messaging: ^15.1.0
+  # كشف الاتصال بالإنترنت
+  connectivity_plus: ^6.0.5
+  # تخزين محلي بسيط (توكن الإشعارات، تفضيلات)
   shared_preferences: ^2.2.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true

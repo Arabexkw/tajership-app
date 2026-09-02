@@ -1,30 +1,34 @@
-# تطبيق تاجرشِب (TajerShip App)
+# تاجرشِب — تطبيق iOS/Android (المسار B)
 
-التطبيق الموحد لمنصة تاجرشِب — تجارة إلكترونية متعددة التجار مع شحن ArabEx، من ArabEx Express الكويتية.
+غلاف أصلي حول **tajership.com** يضيف الميزات الأصلية التي تطلبها آبل (Guideline 4.2):
 
-## الفكرة
+| الميزة الأصلية | الملف |
+|---|---|
+| إشعارات Push (تحديث الطلب/الشحنة، تفتح الرابط داخل التطبيق) | `lib/services/push_service.dart` |
+| مشاركة أصلية (Share Sheet) لصفحة المنتج/المتجر | `lib/screens/home.dart` |
+| حفظ الجلسة (كوكيز WKWebView) — بلا OTP كل فتح | تلقائي في WebView |
+| فتح واتساب/الهاتف/الخرائط بالتطبيق الصحيح، وبوابات الدفع داخل التطبيق | `home.dart → _decideNavigation` |
+| شاشة بداية أصلية + كشف الأوفلاين + زر رجوع ذكي | `main.dart` / `home.dart` |
 
-تطبيق واحد بدخول موحد (نفس فلسفة `/login/` بالمنصة): يدخل التاجر فيشوف طلباته وشحناته، ويدخل السائق فيشوف مهامه وتحصيلات COD.
+## البناء (بدون ماك)
+كل شيء عبر **Codemagic** (`codemagic.yaml`):
+1. الريبو يحفظ كود Dart + الملفات المخصصة فقط (`ios/Runner/Info.plist`، `AppDelegate.swift`، `Podfile`، `AndroidManifest.xml`).
+2. Codemagic يشغّل `flutter create` لتوليد الهياكل الرسمية ثم يطبّق ملفاتنا فوقها ثم يبني.
 
-## البنية
+### المتطلبات في Codemagic
+- **App Store Connect integration** باسم `tajership_asc` (مفتاح API من App Store Connect → Users and Access → Integrations).
+- Bundle ID: `com.tajership.app` (يُنشأ في Apple Developer → Identifiers، مع تفعيل Push Notifications).
+- `APP_STORE_APPLE_ID` بعد إنشاء التطبيق في App Store Connect.
+- (اختياري للإشعارات) مجموعة `tajership_firebase` بمتغير `GOOGLE_SERVICE_INFO_PLIST` = محتوى `GoogleService-Info.plist` مشفّراً base64.
+- (لأندرويد) مجموعة `tajership_keystore`: `CM_KEYSTORE` (base64) + `CM_KEYSTORE_PASSWORD` + `CM_KEY_ALIAS` + `CM_KEY_PASSWORD` — **نفس keystore الأصلي** `com.tajership.app`.
 
-- `lib/main.dart` — نقطة الدخول، الثيم (أسود حبري #14181D + كهرماني #FFB200)، RTL عربي، التوجيه حسب الدور
-- `lib/config.dart` — الإعدادات (عنوان API، مفتاح X-Api-Key يُحقن وقت البناء)
-- `lib/api.dart` — عميل الـ API الموحد (كل الطلبات تمر من هنا حصراً) + وضع المعاينة التجريبي
-- `lib/screens/` — الشاشات: دخول / لوحة التاجر / مهام السائق
-
-## البناء
-
-يتم تلقائياً عبر GitHub Actions عند كل push إلى main — الـ APK يطلع في Artifacts باسم `TajerShip-APK`.
-
-لحقن مفتاح الـ API في نسخة الإنتاج:
-
+## الإشعارات من السيرفر
+الرسالة تحمل `data.url` بالرابط المراد فتحه:
+```json
+{ "to": "<fcm_token>", "notification": {"title": "تحديث طلبك", "body": "شحنتك في الطريق"}, "data": {"url": "https://tajership.com/track?awb=..."} }
 ```
-flutter build apk --release --dart-define=TS_API_KEY=xxxx
-```
+التوكن يُحفظ محلياً بمفتاح `fcm_token` (ربطه بحساب العميل على السيرفر: مهمة لاحقة).
 
-## ملاحظات المرحلة الحالية (v0.1)
-
-- وضع المعاينة التجريبي مفعّل (بيانات نموذجية بدون سيرفر) لمعاينة الواجهات
-- ربط الدخول الحقيقي ينتظر تثبيت عقد `user_auth.php` من السيرفر
-- الخطوة الجاية: إشعارات الطلبات الجديدة + مسح باركود للسائق + متجر العملاء
+## قواعد ثابتة
+- الأسعار والطلبات والدفع تُنفَّذ في السيرفر حصراً — التطبيق واجهة.
+- أي تحديث للموقع يصل التطبيق فوراً بلا إصدار جديد.

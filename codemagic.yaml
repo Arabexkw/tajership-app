@@ -1,0 +1,106 @@
+# ============================================================
+# TajerShip — Codemagic CI/CD (iOS + Android)
+# المسار B: غلاف أصلي + ميزات أصلية (Push / Share / Session)
+#
+# الفكرة: الريبو يحفظ كود Dart + ملفات iOS/Android المخصصة فقط.
+# Codemagic يولّد الهياكل الرسمية بـ `flutter create` ثم يطبّق
+# ملفاتنا المخصصة فوقها — نفس نتيجة توليدها على ماك محلي.
+# ============================================================
+
+workflows:
+  # ---------------------------------------------------------
+  # iOS → TestFlight (ثم App Store)
+  # ---------------------------------------------------------
+  ios-release:
+    name: iOS Release (TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      # يُنشأ من Codemagic → Teams → Integrations → App Store Connect
+      app_store_connect: tajership_asc
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.tajership.app
+      groups:
+        - tajership_firebase   # يحوي GOOGLE_SERVICE_INFO_PLIST (base64) — اختياري
+      vars:
+        APP_STORE_APPLE_ID: 0000000000   # يُحدَّث بعد إنشاء التطبيق في App Store Connect
+    scripts:
+      - name: Generate platform folders (official)
+        script: |
+          # نولّد iOS/Android رسمياً بنفس اسم الحزمة ثم نحتفظ بملفاتنا المخصصة
+          cp -r ios /tmp/ios_custom 2>/dev/null || true
+          cp -r android /tmp/android_custom 2>/dev/null || true
+          flutter create --org com.tajership --project-name tajership --platforms=ios,android .
+          # إعادة تطبيق ملفاتنا المخصصة فوق المولَّد
+          [ -d /tmp/ios_custom ] && cp -rf /tmp/ios_custom/* ios/
+          [ -d /tmp/android_custom ] && cp -rf /tmp/android_custom/* android/
+      - name: Firebase config (optional)
+        script: |
+          if [ -n "${GOOGLE_SERVICE_INFO_PLIST:-}" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "Firebase iOS config written"
+          else
+            echo "No Firebase config — building without Push"
+          fi
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Get packages
+        script: |
+          flutter pub get
+      - name: Launcher icons
+        script: |
+          dart run flutter_launcher_icons || true
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --build-name=1.0.0 \
+            --build-number=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # submit_to_app_store: true   # فعّلها لاحقاً للإرسال المباشر للمراجعة
+
+  # ---------------------------------------------------------
+  # Android → AAB (للتحديث اللاحق على Play بنفس keystore)
+  # ---------------------------------------------------------
+  android-release:
+    name: Android Release (AAB)
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      groups:
+        - tajership_keystore   # CM_KEYSTORE (base64) + CM_KEYSTORE_PASSWORD + CM_KEY_ALIAS + CM_KEY_PASSWORD
+    scripts:
+      - name: Generate platform folders (official)
+        script: |
+          cp -r android /tmp/android_custom 2>/dev/null || true
+          flutter create --org com.tajership --project-name tajership --platforms=android .
+          [ -d /tmp/android_custom ] && cp -rf /tmp/android_custom/* android/
+      - name: Set up keystore
+        script: |
+          echo "$CM_KEYSTORE" | base64 --decode > /tmp/keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=/tmp/keystore.jks
+          EOF
+      - name: Get packages
+        script: flutter pub get
+      - name: Build AAB
+        script: |
+          flutter build appbundle --release --build-name=1.0.1 --build-number=2
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab

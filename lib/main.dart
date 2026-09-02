@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'api.dart';
 import 'config.dart';
-import 'screens/driver_home.dart';
-import 'screens/login.dart';
-import 'screens/merchant_home.dart';
+import 'screens/home.dart';
+import 'services/push_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // تهيئة الإشعارات (تعمل بصمت إن لم تكن Firebase مهيأة بعد)
+  await PushService.instance.init();
+  // شريط الحالة بلون داكن يناسب الهوية
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Color(AppConfig.inkBlack),
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+  ));
   runApp(const TajerShipApp());
 }
 
@@ -18,13 +26,6 @@ class TajerShipApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const ink = Color(AppConfig.inkBlack);
     const amber = Color(AppConfig.amber);
-
-    final scheme = ColorScheme.fromSeed(
-      seedColor: amber,
-      brightness: Brightness.dark,
-      surface: ink,
-      primary: amber,
-    );
 
     return MaterialApp(
       title: 'تاجرشِب',
@@ -38,42 +39,20 @@ class TajerShipApp extends StatelessWidget {
       ],
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: scheme,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: amber,
+          brightness: Brightness.dark,
+          surface: ink,
+          primary: amber,
+        ),
         scaffoldBackgroundColor: ink,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: ink,
-          foregroundColor: Colors.white,
-          centerTitle: true,
-          elevation: 0,
-        ),
-        cardTheme: CardTheme(
-          color: const Color(0xFF1D232B),
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: amber,
-            foregroundColor: ink,
-            minimumSize: const Size.fromHeight(52),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF1D232B),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-        ),
       ),
       home: const SplashScreen(),
     );
   }
 }
 
+/// شاشة بداية أصلية بهوية تاجرشِب (تظهر ثانية ونصف ثم الرئيسية)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -85,56 +64,51 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _boot();
-  }
-
-  Future<void> _boot() async {
-    final session = await api.restore();
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => homeForSession(session)),
-    );
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const HomeScreen(),
+          transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+          transitionDuration: const Duration(milliseconds: 350),
+        ),
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    const ink = Color(AppConfig.inkBlack);
+    const amber = Color(AppConfig.amber);
+    return Scaffold(
+      backgroundColor: ink,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('تاجرشِب',
-                style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.w900,
-                  color: Color(AppConfig.amber),
-                )),
-            SizedBox(height: 8),
-            Text('تجارتك توصل أبعد — مع أرابكس',
-                style: TextStyle(fontSize: 15, color: Colors.white70)),
-            SizedBox(height: 32),
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 3),
+            Image.asset('assets/icon/app_icon.png', width: 120, height: 120),
+            const SizedBox(height: 22),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
+                children: [
+                  TextSpan(text: 'تاجر', style: TextStyle(color: Colors.white)),
+                  TextSpan(text: 'شِب', style: TextStyle(color: amber)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text('تسوّق وتاجر — توصيل وشحن وتتبع',
+                style: TextStyle(color: Colors.white54, fontSize: 13)),
+            const SizedBox(height: 32),
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: amber),
             ),
           ],
         ),
       ),
     );
-  }
-}
-
-/// يوجه المستخدم لواجهته حسب دوره — نفس فلسفة الدخول الموحد بالمنصة
-Widget homeForSession(Session? session) {
-  if (session == null) return const LoginScreen();
-  switch (session.role) {
-    case UserRole.driver:
-      return const DriverHomeScreen();
-    case UserRole.merchant:
-    case UserRole.admin:
-    case UserRole.carrier:
-      return const MerchantHomeScreen();
   }
 }
