@@ -44,21 +44,24 @@ workflows:
       - name: Launcher icons
         script: |
           dart run flutter_launcher_icons || true
+      - name: Flutter build (no codesign)
+        script: |
+          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+          flutter build ios --release --no-codesign --build-name=1.0.0 --build-number=$BUILD_NUMBER
       - name: Fetch or create signing files (cert + profile)
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
-      - name: Set up code signing
+      - name: Set up code signing (after flutter build)
         script: |
           keychain initialize
           keychain add-certificates
           xcode-project use-profiles
-      - name: Flutter build (no codesign) + Xcode archive
+      - name: Xcode archive + export IPA
         script: |
-          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
-          flutter build ios --release --no-codesign --build-name=1.0.0 --build-number=$BUILD_NUMBER
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
