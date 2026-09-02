@@ -19,6 +19,7 @@ workflows:
       vars:
         APP_STORE_APPLE_ID: 6808005611
         BUNDLE_ID: com.tajership.app
+        APPLE_TEAM_ID: 4JK4TN57MH
     scripts:
       - name: Generate platform folders (official)
         script: |
@@ -47,6 +48,13 @@ workflows:
           keychain initialize
           keychain add-certificates
           xcode-project use-profiles
+      - name: Pin team + manual signing in Xcode project
+        script: |
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
+          grep -q "DEVELOPMENT_TEAM" "$PBX" || sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
+          sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$PBX"
+          grep -c "DEVELOPMENT_TEAM = $APPLE_TEAM_ID" "$PBX" || true
       - name: Get packages
         script: |
           flutter pub get
