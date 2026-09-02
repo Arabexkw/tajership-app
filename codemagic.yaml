@@ -19,7 +19,8 @@ workflows:
       vars:
         APP_STORE_APPLE_ID: 6808005611
         BUNDLE_ID: com.tajership.app
-        APPLE_TEAM_ID: 4JK4TN57MH
+        XCODE_WORKSPACE: ios/Runner.xcworkspace
+        XCODE_SCHEME: Runner
     scripts:
       - name: Generate platform folders (official)
         script: |
@@ -37,6 +38,12 @@ workflows:
           else
             echo "No Firebase config - building without Push"
           fi
+      - name: Get packages
+        script: |
+          flutter pub get
+      - name: Launcher icons
+        script: |
+          dart run flutter_launcher_icons || true
       - name: Fetch or create signing files (cert + profile)
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
@@ -48,25 +55,13 @@ workflows:
           keychain initialize
           keychain add-certificates
           xcode-project use-profiles
-      - name: Pin team + manual signing in Xcode project
+      - name: Flutter build (no codesign) + Xcode archive
         script: |
-          PBX=ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
-          grep -q "DEVELOPMENT_TEAM" "$PBX" || sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$PBX"
-          grep -c "DEVELOPMENT_TEAM = $APPLE_TEAM_ID" "$PBX" || true
-      - name: Get packages
-        script: |
-          flutter pub get
-      - name: Launcher icons
-        script: |
-          dart run flutter_launcher_icons || true
-      - name: Build IPA
-        script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist \
-            --build-name=1.0.0 \
-            --build-number=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+          flutter build ios --release --no-codesign --build-name=1.0.0 --build-number=$BUILD_NUMBER
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
