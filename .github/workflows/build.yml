@@ -1,98 +1,61 @@
-name: Build TajerShip APK
+name: Build & Verify (iOS + Android)
 
 on:
   push:
-    branches: [main]
+    branches: [main, ios-pathB]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  ios-verify:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate platform folders (official)
+        run: |
+          cp -r ios /tmp/ios_custom
+          flutter create --org com.tajership --project-name tajership --platforms=ios .
+          cp -rf /tmp/ios_custom/* ios/
+          rm -rf test
+      - name: Pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Launcher icons
+        run: dart run flutter_launcher_icons || true
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+      - name: Report
+        run: echo "iOS build compiled successfully (unsigned)"
+
+  android-apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.24.5"
           channel: stable
           cache: true
-
-      # يولّد مجلدات المنصات (android/) حول الكود الموجود
-      - name: Generate platform folders
+      - name: Generate platform folders (official)
         run: |
-          flutter create --org com.arabex --project-name tajership --platforms android .
-          rm -rf test  # يولّده flutter create بقالب لا يطابق تطبيقنا
-
-      # اسم التطبيق بالعربي + صلاحية الإنترنت لنسخة الإصدار
-      - name: Configure Android manifest
-        run: |
-          M=android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:label="tajership"/android:label="تاجرشِب"/' "$M"
-          grep -q "android.permission.INTERNET" "$M" || \
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$M"
-          cat "$M"
-
+          cp -r android /tmp/android_custom
+          flutter create --org com.tajership --project-name tajership --platforms=android .
+          cp -rf /tmp/android_custom/* android/
+          rm -rf test
       - name: Pub get
         run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos
-
+      - name: Launcher icons
+        run: dart run flutter_launcher_icons || true
       - name: Build APK
         run: flutter build apk --release
-
-      - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk TajerShip-v0.5.0.apk
-
       - uses: actions/upload-artifact@v4
         with:
-          name: TajerShip-APK
-          path: TajerShip-v0.5.0.apk
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.5.0-b${{ github.run_number }}
-          name: TajerShip v0.5.0 (build ${{ github.run_number }})
-          files: TajerShip-v0.5.0.apk
-
-  # نسخة ويب من نفس التطبيق — للمعاينة على آيفون/أي متصفح
-  web:
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.5"
-          channel: stable
-          cache: true
-
-      - name: Generate web platform
-        run: |
-          flutter create --org com.arabex --project-name tajership --platforms web .
-          rm -rf test
-
-      - name: Build web
-        run: flutter build web --release --base-href /tajership-app/
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: TajerShip-APK-pathB
+          path: build/app/outputs/flutter-apk/app-release.apk
