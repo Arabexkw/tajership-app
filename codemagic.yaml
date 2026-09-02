@@ -16,7 +16,6 @@ workflows:
       cocoapods: default
       groups:
         - tajership_signing
-        - tajership_firebase
       vars:
         APP_STORE_APPLE_ID: 6808005611
         BUNDLE_ID: com.tajership.app
