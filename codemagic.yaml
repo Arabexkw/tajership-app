@@ -31,6 +31,13 @@ workflows:
           [ -d /tmp/ios_custom ] && cp -rf /tmp/ios_custom/* ios/
           [ -d /tmp/android_custom ] && cp -rf /tmp/android_custom/* android/
           rm -rf test
+      - name: Force Bundle ID = com.tajership.app
+        script: |
+          # flutter create يولّد com.tajership.tajership — الـ profile لـ com.tajership.app
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = com\.tajership\.tajership\.RunnerTests;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID.RunnerTests;/g" "$PBX"
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = com\.tajership\.tajership;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" "$PBX"
+          echo "Bundle IDs now:"; grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBX" | sort -u
       - name: Firebase config (optional)
         script: |
           if [ -n "${GOOGLE_SERVICE_INFO_PLIST:-}" ]; then
@@ -56,23 +63,16 @@ workflows:
             --type IOS_APP_STORE \
             --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
-      - name: Set up code signing (Runner target only)
+      - name: Set up code signing
         script: |
           keychain initialize
           keychain add-certificates
-          # يطبّق الـ profile على target Runner فقط (لا على Pods)
-          xcode-project use-profiles --project ios/Runner.xcodeproj
-          # تثبيت الفريق على Runner فقط في pbxproj
-          PBX=ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
-          grep -c "DEVELOPMENT_TEAM = $APPLE_TEAM_ID" "$PBX" || true
+          xcode-project use-profiles
       - name: Xcode archive + export IPA
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" \
-            --verbose
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
@@ -96,15 +96,16 @@ workflows:
           flutter create --org com.tajership --project-name tajership --platforms=android .
           [ -d /tmp/android_custom ] && cp -rf /tmp/android_custom/* android/
           rm -rf test
+          sed -i '' 's/applicationId = "com\.tajership\.tajership"/applicationId = "com.tajership.app"/' android/app/build.gradle.kts 2>/dev/null || true
       - name: Set up keystore
         script: |
           echo "$CM_KEYSTORE" | base64 --decode > /tmp/keystore.jks
-          cat > android/key.properties <<EOF
+          cat > android/key.properties <<KEYEOF
           storePassword=$CM_KEYSTORE_PASSWORD
           keyPassword=$CM_KEY_PASSWORD
           keyAlias=$CM_KEY_ALIAS
           storeFile=/tmp/keystore.jks
-          EOF
+          KEYEOF
       - name: Get packages
         script: flutter pub get
       - name: Build AAB
