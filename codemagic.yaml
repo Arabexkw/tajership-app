@@ -56,22 +56,23 @@ workflows:
             --type IOS_APP_STORE \
             --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
-      - name: Set up code signing (after flutter build)
+      - name: Set up code signing (Runner target only)
         script: |
           keychain initialize
           keychain add-certificates
-          xcode-project use-profiles
-          # التقط اسم الـ profile ومعرّف التوقيع من الملفات المحمّلة لتمريرها صراحةً لـ xcodebuild
-          PROFILE_PATH=$(ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/*.mobileprovision | head -1)
-          PROFILE_NAME=$(security cms -D -i "$PROFILE_PATH" | plutil -extract Name raw -o - -)
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
-          echo "Using profile: $PROFILE_NAME"
+          # يطبّق الـ profile على target Runner فقط (لا على Pods)
+          xcode-project use-profiles --project ios/Runner.xcodeproj
+          # تثبيت الفريق على Runner فقط في pbxproj
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBX"
+          grep -c "DEVELOPMENT_TEAM = $APPLE_TEAM_ID" "$PBX" || true
       - name: Xcode archive + export IPA
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=$APPLE_TEAM_ID PROVISIONING_PROFILE_SPECIFIER=\"$PROFILE_NAME\" CODE_SIGN_IDENTITY=\"Apple Distribution\""
+            --archive-xcargs "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" \
+            --verbose
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
