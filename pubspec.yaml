@@ -13,6 +13,7 @@ dependencies:
     sdk: flutter
   # WebView الرسمي من Flutter (iOS WKWebView / Android WebView)
   webview_flutter: ^4.8.0
+  webview_flutter_wkwebview: ^3.14.0
   # المشاركة الأصلية (Share Sheet)
   share_plus: ^10.0.0
   # فتح الروابط الخارجية (واتساب/هاتف/بوابات)

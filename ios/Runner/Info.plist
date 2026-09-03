@@ -74,5 +74,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<!-- التطبيق يستخدم تشفير النظام (HTTPS) فقط — معفى من متطلبات التصدير -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 import '../config.dart';
 import '../services/push_service.dart';
@@ -37,13 +38,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _initWeb() {
-    _web = WebViewController()
+    // iOS: السماح بتشغيل الفيديو مضمّناً (inline) وتلقائياً بدون مشغّل ملء الشاشة
+    late final PlatformWebViewControllerCreationParams params;
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+    _web = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(AppConfig.inkBlack))
       // User-Agent موبايل قياسي + وسم التطبيق (يعرف السيرفر أنه التطبيق الأصلي)
       ..setUserAgent(
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 '
-        '(KHTML, like Gecko) Mobile/15E148 ${AppConfig.userAgentSuffix}',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 '
+        '(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1 ${AppConfig.userAgentSuffix}',
       )
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -56,7 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
             // إخفاء بانر "أضف للشاشة الرئيسية" داخل التطبيق (إن وُجد)
             _web.runJavaScript(
               "try{var b=document.getElementById('tsIosBanner');if(b)b.remove();"
-              "localStorage.setItem('ts_ios_banner_dismissed',String(Date.now()));}catch(e){}",
+              "localStorage.setItem('ts_ios_banner_dismissed',String(Date.now()));"
+              "var m=document.querySelector('meta[name=viewport]');"
+              "if(m&&m.content.indexOf('viewport-fit')<0){m.content=m.content+',viewport-fit=cover';}"
+              "}catch(e){}",
             );
           },
           onWebResourceError: (err) {
@@ -137,7 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final t = await _web.getTitle();
       if (t != null && t.trim().isNotEmpty) title = t.trim();
     } catch (_) {}
-    await Share.share('$title\n$_currentUrl', subject: title);
+    // iOS يتطلب موضع الانبثاق (sharePositionOrigin) وإلا يفشل بصمت على iPad/iOS 17+
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? Rect.fromLTWH(box.size.width - 60, 0, 60, 60)
+        : const Rect.fromLTWH(0, 0, 1, 1);
+    await Share.share('$title\n$_currentUrl', subject: title, sharePositionOrigin: origin);
   }
 
   /// زر الرجوع: يرجع داخل WebView قبل الخروج من التطبيق
@@ -204,10 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : null,
         ),
-        body: SafeArea(
-          top: false,
-          child: _offline ? _offlineView(amber) : WebViewWidget(controller: _web),
-        ),
+        body: _offline ? _offlineView(amber) : WebViewWidget(controller: _web),
       ),
     );
   }
