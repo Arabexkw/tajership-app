@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('FCM Token'),
-        content: SelectableText(t ?? 'لا يوجد توكن — Firebase غير مهيأ أو الإذن مرفوض'),
+        content: SelectableText(PushService.instance.debugInfo + "\n\n" + (t ?? "(no token)")),
         actions: [
           if (t != null)
             TextButton(

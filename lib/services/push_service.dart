@@ -21,6 +21,7 @@ class PushService {
 
   String? _token;
   String? get token => _token;
+  String debugInfo = 'init not called';
 
   bool _ready = false;
 
@@ -33,8 +34,9 @@ class PushService {
       const appId = String.fromEnvironment('FB_APP_ID');
       const senderId = String.fromEnvironment('FB_SENDER_ID');
       const projectId = String.fromEnvironment('FB_PROJECT_ID');
+      debugInfo = 'opts key=${apiKey.length} app=${appId.length} sender=${senderId.length} proj=${projectId.length}';
       if (apiKey.isEmpty || appId.isEmpty) {
-        debugPrint('PushService: Firebase options missing at build time');
+        debugInfo += ' | MISSING OPTIONS';
         return;
       }
       await Firebase.initializeApp(
@@ -59,12 +61,15 @@ class PushService {
       );
 
       // iOS: توكن FCM يحتاج توكن APNs أولاً — ننتظره حتى 10 ثوانٍ قبل الطلب
+      String? apns;
       for (var i = 0; i < 20; i++) {
-        final apns = await fm.getAPNSToken();
+        apns = await fm.getAPNSToken();
         if (apns != null) break;
         await Future.delayed(const Duration(milliseconds: 500));
       }
+      debugInfo += ' | apns=' + (apns == null ? 'null' : 'ok');
       _token = await fm.getToken();
+      debugInfo += ' | fcm=' + (_token == null ? 'null' : 'ok');
       debugPrint('FCM token: ${_token ?? "null"}');
       await _persistToken(_token);
       fm.onTokenRefresh.listen((t) {
@@ -81,7 +86,7 @@ class PushService {
 
       _ready = true;
     } catch (e) {
-      // Firebase غير مهيأ (مثلاً قبل إضافة ملفات الإعداد) — التطبيق يعمل بدون Push
+      debugInfo += ' | EXC: $e';
       debugPrint('PushService init skipped: $e');
     }
   }
