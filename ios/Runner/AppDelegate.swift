@@ -10,9 +10,7 @@ import FirebaseMessaging
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     // تهيئة Firebase (Push) — يتطلب GoogleService-Info.plist في Runner/
-    if FileManager.default.fileExists(atPath: Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") ?? "") {
-      FirebaseApp.configure()
-    }
+    // Firebase يُهيَّأ من Dart عبر FirebaseOptions (لا حاجة لملف plist في الـ bundle)
     GeneratedPluginRegistrant.register(with: self)
     // تسجيل الإشعارات البعيدة
     UNUserNotificationCenter.current().delegate = self

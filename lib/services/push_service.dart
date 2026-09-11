@@ -28,7 +28,24 @@ class PushService {
   Future<void> init() async {
     if (_ready) return;
     try {
-      await Firebase.initializeApp();
+      // التهيئة بالقيم المحقونة وقت البناء (--dart-define) — لا تعتمد على GoogleService-Info.plist
+      const apiKey = String.fromEnvironment('FB_API_KEY');
+      const appId = String.fromEnvironment('FB_APP_ID');
+      const senderId = String.fromEnvironment('FB_SENDER_ID');
+      const projectId = String.fromEnvironment('FB_PROJECT_ID');
+      if (apiKey.isEmpty || appId.isEmpty) {
+        debugPrint('PushService: Firebase options missing at build time');
+        return;
+      }
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: apiKey,
+          appId: appId,
+          messagingSenderId: senderId,
+          projectId: projectId,
+          iosBundleId: 'com.tajership.app',
+        ),
+      );
       final fm = FirebaseMessaging.instance;
 
       // iOS: طلب إذن الإشعارات (يظهر مرة واحدة للمستخدم)
