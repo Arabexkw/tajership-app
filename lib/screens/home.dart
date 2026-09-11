@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -159,6 +160,31 @@ class _HomeScreenState extends State<HomeScreen> {
     await Share.share('$title\n$_currentUrl', subject: title, sharePositionOrigin: origin);
   }
 
+  /// تشخيص: عرض توكن FCM ونسخه
+  Future<void> _showToken() async {
+    final t = PushService.instance.token;
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('FCM Token'),
+        content: SelectableText(t ?? 'لا يوجد توكن — Firebase غير مهيأ أو الإذن مرفوض'),
+        actions: [
+          if (t != null)
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: t));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ التوكن')));
+              },
+              child: const Text('نسخ'),
+            ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق')),
+        ],
+      ),
+    );
+  }
+
   /// زر الرجوع: يرجع داخل WebView قبل الخروج من التطبيق
   Future<bool> _onWillPop() async {
     if (await _web.canGoBack()) {
@@ -193,8 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: ink,
           toolbarHeight: 44,
           elevation: 0,
-          title: const Text('تاجرشِب',
-              style: TextStyle(color: amber, fontWeight: FontWeight.w900, fontSize: 18)),
+          title: GestureDetector(
+            onLongPress: _showToken,
+            child: const Text('تاجرشِب',
+                style: TextStyle(color: amber, fontWeight: FontWeight.w900, fontSize: 18)),
+          ),
           leading: IconButton(
             tooltip: 'الرئيسية',
             icon: const Icon(Icons.home_rounded, color: Colors.white70),
