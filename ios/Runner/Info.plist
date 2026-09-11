@@ -52,8 +52,6 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
 	<!-- السماح بفتح واتساب والهاتف من روابط الموقع -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>

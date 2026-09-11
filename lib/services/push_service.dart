@@ -58,7 +58,14 @@ class PushService {
         sound: true,
       );
 
+      // iOS: توكن FCM يحتاج توكن APNs أولاً — ننتظره حتى 10 ثوانٍ قبل الطلب
+      for (var i = 0; i < 20; i++) {
+        final apns = await fm.getAPNSToken();
+        if (apns != null) break;
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
       _token = await fm.getToken();
+      debugPrint('FCM token: ${_token ?? "null"}');
       await _persistToken(_token);
       fm.onTokenRefresh.listen((t) {
         _token = t;
