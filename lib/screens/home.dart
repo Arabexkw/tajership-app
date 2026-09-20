@@ -160,27 +160,24 @@ class _HomeScreenState extends State<HomeScreen> {
     await Share.share('$title\n$_currentUrl', subject: title, sharePositionOrigin: origin);
   }
 
-  /// تشخيص: عرض توكن FCM ونسخه
-  Future<void> _showToken() async {
-    final t = PushService.instance.token;
+  /// تشخيص مؤقت: حالة السلة داخل WebView
+  Future<void> _diagCart() async {
+    String info;
+    try {
+      final r = await _web.runJavaScriptReturningResult(
+        "(function(){try{var c=localStorage.getItem('ts_cart');return JSON.stringify({host:location.host,path:location.pathname,ua_app:/TajerShipApp/.test(navigator.userAgent),ls_ok:(function(){try{localStorage.setItem('__t','1');localStorage.removeItem('__t');return true}catch(e){return String(e)}})(),cart_len:c?c.length:0,cart_head:c?c.slice(0,120):null,keys:Object.keys(localStorage)});}catch(e){return 'ERR:'+e}})()",
+      );
+      info = r.toString();
+    } catch (e) {
+      info = 'EXC: $e';
+    }
     if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('FCM Token'),
-        content: SelectableText(PushService.instance.debugInfo + "\n\n" + (t ?? "(no token)")),
-        actions: [
-          if (t != null)
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: t));
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ التوكن')));
-              },
-              child: const Text('نسخ'),
-            ),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق')),
-        ],
+        title: const Text('Cart diag'),
+        content: SelectableText(info),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))],
       ),
     );
   }
@@ -220,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
           toolbarHeight: 44,
           elevation: 0,
           title: GestureDetector(
-            onLongPress: _showToken,
+            onLongPress: _diagCart,
             child: const Text('تاجرشِب',
                 style: TextStyle(color: amber, fontWeight: FontWeight.w900, fontSize: 18)),
           ),
