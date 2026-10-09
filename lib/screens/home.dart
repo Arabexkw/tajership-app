@@ -160,25 +160,55 @@ class _HomeScreenState extends State<HomeScreen> {
     await Share.share('$title\n$_currentUrl', subject: title, sharePositionOrigin: origin);
   }
 
-  /// تشخيص مؤقت: حالة السلة داخل WebView
-  Future<void> _diagCart() async {
-    String info;
-    try {
-      final r = await _web.runJavaScriptReturningResult(
-        "(function(){try{var c=localStorage.getItem('ts_cart');return JSON.stringify({host:location.host,path:location.pathname,ua_app:/TajerShipApp/.test(navigator.userAgent),ls_ok:(function(){try{localStorage.setItem('__t','1');localStorage.removeItem('__t');return true}catch(e){return String(e)}})(),cart_len:c?c.length:0,cart_head:c?c.slice(0,120):null,keys:Object.keys(localStorage)});}catch(e){return 'ERR:'+e}})()",
-      );
-      info = r.toString();
-    } catch (e) {
-      info = 'EXC: $e';
-    }
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cart diag'),
-        content: SelectableText(info),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))],
-      ),
+  /// فتح صفحة داخل التطبيق (حسابي / حذف الحساب / الخصوصية)
+  void _openInApp(String url) => _web.loadRequest(Uri.parse(url));
+
+  /// قائمة الحساب الأصلية — «حذف الحساب» ظاهر دائماً (شرط Apple 5.1.1v)
+  Widget _accountMenu() {
+    return PopupMenuButton<String>(
+      tooltip: 'الحساب',
+      icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+      color: Colors.white,
+      onSelected: (v) {
+        switch (v) {
+          case 'share':
+            _share();
+            break;
+          case 'privacy':
+            _openInApp(AppConfig.privacyUrl);
+            break;
+          case 'delete':
+            _openInApp(AppConfig.deleteAccountUrl);
+            break;
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: 'share',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.ios_share_rounded),
+            title: Text('مشاركة الصفحة'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'privacy',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.privacy_tip_outlined),
+            title: Text('سياسة الخصوصية'),
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.person_remove_outlined, color: Color(0xFFC62828)),
+            title: Text('حذف الحساب', style: TextStyle(color: Color(0xFFC62828))),
+          ),
+        ),
+      ],
     );
   }
 
@@ -216,11 +246,8 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: ink,
           toolbarHeight: 44,
           elevation: 0,
-          title: GestureDetector(
-            onLongPress: _diagCart,
-            child: const Text('تاجرشِب',
-                style: TextStyle(color: amber, fontWeight: FontWeight.w900, fontSize: 18)),
-          ),
+          title: const Text('تاجرشِب',
+              style: TextStyle(color: amber, fontWeight: FontWeight.w900, fontSize: 18)),
           leading: IconButton(
             tooltip: 'الرئيسية',
             icon: const Icon(Icons.home_rounded, color: Colors.white70),
@@ -228,15 +255,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           actions: [
             IconButton(
-              tooltip: 'مشاركة',
-              icon: const Icon(Icons.ios_share_rounded, color: Colors.white70),
-              onPressed: _share,
-            ),
-            IconButton(
               tooltip: 'تحديث',
               icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
               onPressed: () => _web.reload(),
             ),
+            _accountMenu(),
           ],
           bottom: _loading
               ? const PreferredSize(

@@ -76,6 +76,22 @@ workflows:
             --dart-define=FB_APP_ID="${FB_APP_ID:-}" \
             --dart-define=FB_SENDER_ID="${FB_SENDER_ID:-}" \
             --dart-define=FB_PROJECT_ID="${FB_PROJECT_ID:-}"
+      - name: Guard - no App Tracking Transparency in binary (Apple 2.5.1)
+        script: |
+          # رفض Apple 6-10: "binary contains references to App Tracking Transparency"
+          # تاجرشِب لا يتتبع (App Privacy مصحح) — أي مرجع ATT يوقف البناء قبل التوقيع والرفع
+          APP=build/ios/iphoneos/Runner.app
+          echo "--- linked frameworks (main binary):"
+          otool -L "$APP/Runner" | grep -i -E "tracking|adsupport" || echo "none"
+          echo "--- plist keys:"
+          /usr/libexec/PlistBuddy -c 'Print :NSUserTrackingUsageDescription' "$APP/Info.plist" 2>/dev/null && FOUND=1 || echo "no NSUserTrackingUsageDescription"
+          echo "--- symbol/string scan (app + embedded frameworks):"
+          HITS=$(grep -rl -a -E "AppTrackingTransparency|ATTrackingManager|requestTrackingAuthorization" "$APP" 2>/dev/null || true)
+          if [ -n "$HITS" ]; then echo "ATT REFERENCES FOUND IN:"; echo "$HITS"; FOUND=1; else echo "clean"; fi
+          if [ "${FOUND:-0}" = "1" ]; then
+            echo "STOP: remove the dependency above before resubmitting to App Review"; exit 1
+          fi
+
       - name: Fetch or create signing files (cert + profile)
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
