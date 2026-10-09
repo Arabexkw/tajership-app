@@ -25,6 +25,11 @@ class AppConfig {
     'test-gateway.mastercard.com',
   ];
 
+  /// صفحات تُفتح خارج التطبيق (Safari): تسجيل التجار الجدد
+  static const List<String> externalPaths = [
+    '/register',
+  ];
+
   /// ملف حذف الحساب (مطلوب من آبل وجوجل)
   static const String deleteAccountUrl = 'https://tajership.com/delete-account.html';
 

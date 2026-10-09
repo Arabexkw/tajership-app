@@ -111,6 +111,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return NavigationDecision.prevent;
     }
 
+    // تسجيل التجار الجدد يتم من الموقع (Safari) لا من داخل التطبيق —
+    // التطبيق للتسوق؛ إنشاء حساب التاجر خارجه (Apple 5.1.1v يخص الحسابات المنشأة داخل التطبيق)
+    final isMerchantSignup = AppConfig.internalHosts.contains(host) &&
+        AppConfig.externalPaths.any((p) => uri.path.toLowerCase().startsWith(p));
+    if (isMerchantSignup) {
+      _openExternal(uri);
+      return NavigationDecision.prevent;
+    }
+
     // نطاقات تاجرشِب وبوابات الدفع → داخل التطبيق
     final internal = AppConfig.internalHosts.any((h) => host == h || host.endsWith('.$h'));
     final payment = AppConfig.paymentHosts.any((h) => host == h || host.endsWith('.$h'));
