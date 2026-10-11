@@ -30,6 +30,9 @@ class AppConfig {
     '/register',
   ];
 
+  /// حساب العميل: دخول برمز OTP + الطلبات + تسجيل الخروج
+  static const String accountUrl = 'https://tajership.com/account.html';
+
   /// ملف حذف الحساب (مطلوب من آبل وجوجل)
   static const String deleteAccountUrl = 'https://tajership.com/delete-account.html';
 

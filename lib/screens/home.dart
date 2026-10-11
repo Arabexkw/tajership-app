@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _offline = false;
   String _currentUrl = AppConfig.homeUrl;
+  bool _pendingLogout = false;
   StreamSubscription<String>? _pushSub;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
 
@@ -73,6 +74,14 @@ class _HomeScreenState extends State<HomeScreen> {
               "if(m&&m.content.indexOf('viewport-fit')<0){m.content=m.content+',viewport-fit=cover';}"
               "}catch(e){}",
             );
+            // «تسجيل الخروج» من القائمة: نفتح حسابي ثم ننفّذ خروج العميل من صفحته
+            if (_pendingLogout && url.contains('account.html')) {
+              _pendingLogout = false;
+              _web.runJavaScript(
+                "try{window.confirm=function(){return true};"
+                "if(typeof doLogout==='function'){doLogout();}}catch(e){}",
+              );
+            }
           },
           onWebResourceError: (err) {
             // فشل تحميل الصفحة الرئيسية نفسها (لا الموارد الفرعية)
@@ -180,6 +189,13 @@ class _HomeScreenState extends State<HomeScreen> {
       color: Colors.white,
       onSelected: (v) {
         switch (v) {
+          case 'account':
+            _openInApp(AppConfig.accountUrl);
+            break;
+          case 'logout':
+            _pendingLogout = true;
+            _openInApp(AppConfig.accountUrl);
+            break;
           case 'share':
             _share();
             break;
@@ -192,6 +208,24 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: 'account',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.person_outline_rounded),
+            title: Text('حسابي وطلباتي'),
+            subtitle: Text('دخول العملاء برمز على الإيميل'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'logout',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.logout_rounded),
+            title: Text('تسجيل الخروج'),
+          ),
+        ),
+        PopupMenuDivider(),
         PopupMenuItem(
           value: 'share',
           child: ListTile(
@@ -263,6 +297,12 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => _web.loadRequest(Uri.parse(AppConfig.homeUrl)),
           ),
           actions: [
+            // «حسابي» ظاهر دائماً: دخول العملاء + الطلبات + الخروج
+            IconButton(
+              tooltip: 'حسابي',
+              icon: const Icon(Icons.person_rounded, color: amber),
+              onPressed: () => _openInApp(AppConfig.accountUrl),
+            ),
             IconButton(
               tooltip: 'تحديث',
               icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
