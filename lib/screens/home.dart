@@ -74,6 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
               "if(m&&m.content.indexOf('viewport-fit')<0){m.content=m.content+',viewport-fit=cover';}"
               "}catch(e){}",
             );
+            // وضع التطبيق: إخفاء مداخل التجار والسواقين (التطبيق للعملاء فقط)
+            _web.runJavaScript(_hideMerchantLinksJs);
             // «تسجيل الخروج» من القائمة: نفتح حسابي ثم ننفّذ خروج العميل من صفحته
             if (_pendingLogout && url.contains('account.html')) {
               _pendingLogout = false;
@@ -120,12 +122,14 @@ class _HomeScreenState extends State<HomeScreen> {
       return NavigationDecision.prevent;
     }
 
-    // تسجيل التجار الجدد يتم من الموقع (Safari) لا من داخل التطبيق —
-    // التطبيق للتسوق؛ إنشاء حساب التاجر خارجه (Apple 5.1.1v يخص الحسابات المنشأة داخل التطبيق)
+    // تسجيل التجار الجدد ليس جزءاً من التطبيق (التطبيق للتسوق) — لا نفتح Safari
+    // (رفض Apple 13-10، إرشاد 4: الانتقال للمتصفح للتسجيل تجربة سيئة) ولا نعرض الصفحة
+    // داخل التطبيق (إنشاء حساب تاجر داخله يستوجب حذفه داخله، 5.1.1v). روابطه مخفية في
+    // وضع التطبيق، وهذا حارس احتياطي يوقف التنقل برسالة داخل التطبيق.
     final isMerchantSignup = AppConfig.internalHosts.contains(host) &&
         AppConfig.externalPaths.any((p) => uri.path.toLowerCase().startsWith(p));
     if (isMerchantSignup) {
-      _openExternal(uri);
+      _toast('تسجيل المتاجر الجديدة يتم من موقع tajership.com — التطبيق مخصص للتسوق وتتبع الطلبات');
       return NavigationDecision.prevent;
     }
 
@@ -144,6 +148,33 @@ class _HomeScreenState extends State<HomeScreen> {
     _openExternal(uri);
     return NavigationDecision.prevent;
   }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, textDirection: TextDirection.rtl),
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
+  /// وضع التطبيق: إخفاء مداخل التجار/السواقين من صفحات الموقع (تسجيل تاجر، بوابة
+  /// التجار /login/، بوابة السواقين). يُحقن بعد كل تحميل ويراقب المحتوى الديناميكي.
+  static const String _hideMerchantLinksJs = r"""
+(function(){
+  if (window.__tsAppHide) return; window.__tsAppHide = true;
+  var SEL = 'a[href*="register"], a[href="/login/"], a[href="/login"], a[href$="tajership.com/login/"], a[href$="tajership.com/login"], a[href^="driver/"], a[href^="/driver/"]';
+  function hide(){
+    try {
+      document.querySelectorAll(SEL).forEach(function(a){
+        var box = a.closest('li') || a;
+        box.style.setProperty('display','none','important');
+      });
+    } catch(e) {}
+  }
+  hide();
+  try { new MutationObserver(hide).observe(document.documentElement, {childList:true, subtree:true}); } catch(e) {}
+})();
+""";
 
   Future<void> _openExternal(Uri uri) async {
     try {

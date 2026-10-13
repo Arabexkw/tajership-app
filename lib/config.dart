@@ -25,7 +25,8 @@ class AppConfig {
     'test-gateway.mastercard.com',
   ];
 
-  /// صفحات تُفتح خارج التطبيق (Safari): تسجيل التجار الجدد
+  /// صفحات لا تُعرض داخل التطبيق ولا تُفتح في Safari (تسجيل التجار الجدد — من الموقع فقط):
+  /// روابطها تُخفى في وضع التطبيق، والتنقل إليها يُوقف برسالة (Apple إرشاد 4 و 5.1.1v)
   static const List<String> externalPaths = [
     '/register',
   ];
