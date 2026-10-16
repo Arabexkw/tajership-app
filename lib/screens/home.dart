@@ -157,12 +157,14 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
-  /// وضع التطبيق: إخفاء مداخل التجار/السواقين من صفحات الموقع (تسجيل تاجر، بوابة
-  /// التجار /login/، بوابة السواقين). يُحقن بعد كل تحميل ويراقب المحتوى الديناميكي.
+  /// وضع التطبيق: إخفاء روابط تسجيل التجار الجدد وبوابة السواقين من صفحات الموقع
+  /// (دخول التجار/الأدمن /login/ يبقى ظاهراً). يُحقن بعد كل تحميل ويراقب المحتوى الديناميكي.
   static const String _hideMerchantLinksJs = r"""
 (function(){
   if (window.__tsAppHide) return; window.__tsAppHide = true;
-  var SEL = 'a[href*="register"], a[href="/login/"], a[href="/login"], a[href$="tajership.com/login/"], a[href$="tajership.com/login"], a[href^="driver/"], a[href^="/driver/"]';
+  // ملاحظة 17-10: «دخول المحظوظين» (/login/) يبقى ظاهراً — دخول حسابات التجار/الأدمن الموجودة
+  // مسموح داخل التطبيق؛ المخفي فقط إنشاء حساب تاجر جديد وبوابة السواقين.
+  var SEL = 'a[href*="register"], a[href^="driver/"], a[href^="/driver/"]';
   function hide(){
     try {
       document.querySelectorAll(SEL).forEach(function(a){
