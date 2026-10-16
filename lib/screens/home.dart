@@ -77,12 +77,20 @@ class _HomeScreenState extends State<HomeScreen> {
             // وضع التطبيق: إخفاء مداخل التجار والسواقين (التطبيق للعملاء فقط)
             _web.runJavaScript(_hideMerchantLinksJs);
             // «تسجيل الخروج» من القائمة: نفتح حسابي ثم ننفّذ خروج العميل من صفحته
+            // بعد logout.php (يحوّل إلى /login/) → نكمل خروج العميل من صفحة حسابي
+            if (_pendingLogout && !url.contains('account.html') &&
+                (url.contains('/login') || url.contains('logout.php'))) {
+              _openInApp(AppConfig.accountUrl);
+            }
             if (_pendingLogout && url.contains('account.html')) {
               _pendingLogout = false;
               _web.runJavaScript(
                 "try{window.confirm=function(){return true};"
                 "if(typeof doLogout==='function'){doLogout();}}catch(e){}",
               );
+              _toast('تم تسجيل الخروج');
+              Future.delayed(const Duration(milliseconds: 900),
+                  () => _web.loadRequest(Uri.parse(AppConfig.homeUrl)));
             }
           },
           onWebResourceError: (err) {
@@ -226,8 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _openInApp(AppConfig.accountUrl);
             break;
           case 'logout':
+            // خروج موحّد: أولاً جلسة التاجر/الأدمن على السيرفر (logout.php) ثم جلسة العميل (account.html)
             _pendingLogout = true;
-            _openInApp(AppConfig.accountUrl);
+            _openInApp(AppConfig.logoutUrl);
             break;
           case 'share':
             _share();
@@ -245,17 +254,17 @@ class _HomeScreenState extends State<HomeScreen> {
           value: 'account',
           child: ListTile(
             dense: true,
-            leading: Icon(Icons.person_outline_rounded),
-            title: Text('حسابي وطلباتي'),
-            subtitle: Text('دخول العملاء برمز على الإيميل'),
+            leading: Icon(Icons.person_outline_rounded, color: Color(AppConfig.inkBlack)),
+            title: Text('حسابي وطلباتي', style: TextStyle(color: Color(AppConfig.inkBlack), fontWeight: FontWeight.w600)),
+            subtitle: Text('دخول العملاء برمز على الإيميل', style: TextStyle(color: Color(0xFF5F6670))),
           ),
         ),
         PopupMenuItem(
           value: 'logout',
           child: ListTile(
             dense: true,
-            leading: Icon(Icons.logout_rounded),
-            title: Text('تسجيل الخروج'),
+            leading: Icon(Icons.logout_rounded, color: Color(AppConfig.inkBlack)),
+            title: Text('تسجيل الخروج', style: TextStyle(color: Color(AppConfig.inkBlack), fontWeight: FontWeight.w600)),
           ),
         ),
         PopupMenuDivider(),
@@ -263,16 +272,16 @@ class _HomeScreenState extends State<HomeScreen> {
           value: 'share',
           child: ListTile(
             dense: true,
-            leading: Icon(Icons.ios_share_rounded),
-            title: Text('مشاركة الصفحة'),
+            leading: Icon(Icons.ios_share_rounded, color: Color(AppConfig.inkBlack)),
+            title: Text('مشاركة الصفحة', style: TextStyle(color: Color(AppConfig.inkBlack), fontWeight: FontWeight.w600)),
           ),
         ),
         PopupMenuItem(
           value: 'privacy',
           child: ListTile(
             dense: true,
-            leading: Icon(Icons.privacy_tip_outlined),
-            title: Text('سياسة الخصوصية'),
+            leading: Icon(Icons.privacy_tip_outlined, color: Color(AppConfig.inkBlack)),
+            title: Text('سياسة الخصوصية', style: TextStyle(color: Color(AppConfig.inkBlack), fontWeight: FontWeight.w600)),
           ),
         ),
         PopupMenuDivider(),
@@ -281,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListTile(
             dense: true,
             leading: Icon(Icons.person_remove_outlined, color: Color(0xFFC62828)),
-            title: Text('حذف الحساب', style: TextStyle(color: Color(0xFFC62828))),
+            title: Text('حذف الحساب', style: TextStyle(color: Color(0xFFC62828), fontSize: 13)),
           ),
         ),
       ],
